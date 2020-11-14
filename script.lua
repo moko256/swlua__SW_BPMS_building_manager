@@ -23,7 +23,7 @@ building_infos = {}  -- Array<{name, is_hidden}>
 g_savedata = {}
 -- g_savedata.spawned_ids          -- Map<vehicle_id, playlist_index>
 -- g_savedata.active_indexes       -- Array<is_active>
--- g_savedata.map_markers          -- Map<vehicle_id, {playlist_index, ui_id, vehicle_name, vehicle_xz {x,z}}>
+-- g_savedata.map_markers          -- List<{playlist_index, ui_id, icon_id, vehicle_name, vehicle_xz {x,z}}>
 
 msg_head = "[?bm]"
 function l_msg(id, msg)
@@ -73,7 +73,34 @@ function l_spawn_building(num)
 		local id = building_indexes[num]
 		local loc_c = server.getPlaylistData(id)["location_count"]
 		for l = 0, loc_c-1 do
-			server.spawnMissionLocation(matrix.translation(0,0,0),id,l)
+			local loc_mat = server.spawnMissionLocation(matrix.translation(0,0,0),id,l)
+			local loc_mx, loc_my, loc_mz = matrix.position(loc_mat)
+
+			local cmp_c = server.getLocationData(id,l)["component_count"]
+			for c = 0, cmp_c-1 do
+				local cmp_d = server.getLocationComponentData(id, l, c)
+				local name = cmp_d.display_name
+				if name ~= "" then
+					local map_id = server.getMapID()
+					local v_mat_x, v_mat_y, v_mat_z = matrix.position(cmp_d.transform)
+					local icon_id = 1 -- default: cross icon
+					for k,t in pairs(cmp_d.tags) do
+						local splv = string.sub(t,18,-1)
+						if string.sub(t,1,17) == "SW_BPMS_map_icon=" and string.match(splv, "[0-9]+") then
+							icon_id = tonumber(splv)
+							break
+						end
+					end
+					table.insert(g_savedata.map_markers, {
+						playlist_index = id,
+						ui_id = map_id,
+						icon_id = icon_id,
+						vehicle_name = name,
+						vehicle_xz = {x = v_mat_x + loc_mx, z = v_mat_z + loc_mz}
+					})
+					server.addMapLabel(-1, map_id, icon_id, name, v_mat_x + loc_mx, v_mat_z + loc_mz)
+				end
+			end
 		end
 		g_savedata.active_indexes[num] = true
 	end
@@ -86,10 +113,10 @@ function l_despawn_building(num)
 			g_savedata.spawned_ids[id] = nil
 		end
 	end
-	for v_id, map_data in pairs(g_savedata.map_markers) do
+	for idx, map_data in pairs(g_savedata.map_markers) do
 		if map_data.playlist_index == building_indexes[num] then
 			server.removeMapID(-1, map_data.ui_id)
-			g_savedata.map_markers[v_id] = nil
+			g_savedata.map_markers[idx] = nil
 		end
 	end
 	g_savedata.active_indexes[num] = false
@@ -240,23 +267,11 @@ function onSpawnMissionComponent(id, name, type, playlist_index)
 	local i = l_array_index_of(building_indexes, playlist_index)
 	if i ~= -1 then
 		g_savedata.spawned_ids[id] = playlist_index
-		if name ~= "" then
-			local map_id = server.getMapID()
-			local raw_pos = server.getVehiclePos(id, 0, 0, 0)
-			local v_mat_x, v_mat_y, v_mat_z = matrix.position(raw_pos)
-			g_savedata.map_markers[id] = {
-				playlist_index = playlist_index,
-				ui_id = map_id,
-				vehicle_name = name,
-				vehicle_xz = {x = v_mat_x, z = v_mat_z}
-			}
-			server.addMapLabel(-1, map_id, 1, name, v_mat_x, v_mat_z)
-		end
 	end
 end
 
 function onPlayerJoin(steam_id, name, peer_id, is_admin, is_auth)
 	for v_id, map_data in pairs(g_savedata.map_markers) do
-		server.addMapLabel(peer_id, map_data.ui_id, 1 --[[ cross label --]], map_data.vehicle_name, map_data.vehicle_xz.x, map_data.vehicle_xz.z)
+		server.addMapLabel(peer_id, map_data.ui_id, map_data.icon_id, map_data.vehicle_name, map_data.vehicle_xz.x, map_data.vehicle_xz.z)
 	end
 end

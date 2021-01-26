@@ -73,7 +73,7 @@ function l_spawn_building(num)
 		local id = building_indexes[num]
 		local loc_c = server.getPlaylistData(id)["location_count"]
 		for l = 0, loc_c-1 do
-			local loc_mat = server.spawnMissionLocation(matrix.translation(0,0,0),id,l)
+			local loc_mat = server.spawnAddonLocation(matrix.translation(0,0,0),id,l)
 			local loc_mx, loc_my, loc_mz = matrix.position(loc_mat)
 
 			local cmp_c = server.getLocationData(id,l)["component_count"]
@@ -155,8 +155,8 @@ function onCreate(is_world_create)
 	end
 
 	local c = 1 -- SW_BPMS compatible mission counter
-	for i = 0, server.getPlaylistCount() - 1 do -- all mission counter
-		local pl = server.getPlaylistData(i)
+	for i = 0, server.getAddonCount() - 1 do -- all mission counter
+		local pl = server.getAddonData(i)
 		if pl ~= nil then
 			local name = pl["name"]
 			local prefix = string.sub(name,1,8)
@@ -263,7 +263,7 @@ function onCustomCommand(full_msg, u_id, is_admin, is_auth, cmd, op_r, tgt)
 	end
 end
 
-function onSpawnMissionComponent(id, name, type, playlist_index)
+function onSpawnAddonComponent(id, name, type, playlist_index)
 	local i = l_array_index_of(building_indexes, playlist_index)
 	if i ~= -1 then
 		g_savedata.spawned_ids[id] = playlist_index
